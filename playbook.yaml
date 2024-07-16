@@ -100,3 +100,23 @@
       debug:
         var: jenkins_logs.stdout_lines
       when: jenkins_service is failed 
+
+- name: Install nginx
+  apt:
+    name: nginx
+    state: present
+    update_cache: yes
+
+- name: Copy test.html to nginx web root
+  copy:
+    src: test.html
+    dest: /var/www/html/test.html
+    owner: www-data
+    group: www-data
+    mode: '0644'
+
+- name: Ensure nginx is running and enabled
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
