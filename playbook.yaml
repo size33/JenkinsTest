@@ -101,23 +101,13 @@
         var: jenkins_logs.stdout_lines
       when: jenkins_service is failed
 
-    - name: Install nginx
+    - name: Ensure Apache is installed
       apt:
-        name: nginx
+        name: apache2
         state: present
         update_cache: yes
 
-    - name: Ensure test.html exists
-      stat:
-        path: test.html
-      register: test_html_file
-
-    - name: Fail if test.html is not found
-      fail:
-        msg: "The file test.html does not exist"
-      when: not test_html_file.stat.exists
-
-    - name: Copy test.html to nginx web root
+    - name: Copy test.html to Apache web root
       copy:
         src: test.html
         dest: /var/www/html/test.html
@@ -125,8 +115,8 @@
         group: www-data
         mode: '0644'
 
-    - name: Ensure nginx is running and enabled
+    - name: Ensure Apache is running and enabled
       systemd:
-        name: nginx
+        name: apache2
         state: started
         enabled: yes
