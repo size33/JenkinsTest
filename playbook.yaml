@@ -1,0 +1,102 @@
+- hosts: jenkins
+  become: yes
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Upgrade all apt packages
+      apt:
+        upgrade: dist
+
+    - name: Install dependencies
+      apt:
+        name: "{{ packages }}"
+        state: present
+        update_cache: yes
+      vars:
+        packages:
+        - openjdk-11-jre  # Update Java version if needed
+        - curl
+        - git
+        - acl
+
+    - name: Add jenkins user and append to admin group
+      user:
+        name: jenkins
+        shell: /bin/bash
+        password: ''
+        groups: admin
+        append: yes
+    
+    - name: Allow 'jenkins' user to have passwordless sudo
+      lineinfile:
+        dest: /etc/sudoers
+        state: present
+        line: 'jenkins ALL=(ALL) NOPASSWD:ALL'
+        validate: 'visudo -cf %s'
+
+    - name: Download Jenkins GPG key
+      get_url:
+        url: https://pkg.jenkins.io/debian/jenkins.io.key
+        dest: /tmp/jenkins.key
+
+    - name: Add Jenkins GPG key to keyring
+      command: gpg --no-default-keyring --keyring /usr/share/keyrings/jenkins-keyring.gpg --import /tmp/jenkins.key
+
+    - name: Add Jenkins repository
+      apt_repository:
+        repo: 'deb [signed-by=/usr/share/keyrings/jenkins-keyring.gpg] https://pkg.jenkins.io/debian-stable binary/'
+        state: present
+        filename: 'jenkins.list'
+
+    - name: Update apt cache again
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+        update_cache: yes
+
+    - name: Ensure Jenkins directory permissions
+      file:
+        path: /var/lib/jenkins
+        state: directory
+        owner: jenkins
+        group: jenkins
+        recurse: yes
+
+    - name: Force systemd to re-execute itself
+      systemd:
+        daemon_reload: yes
+        scope: system
+
+    - name: Start Jenkins service
+      systemd:
+        name: jenkins
+        state: started
+        scope: system
+      register: jenkins_service
+
+    - name: Display Jenkins service status
+      debug:
+        var: jenkins_service
+
+    - name: Check Jenkins service status
+      command: systemctl status jenkins.service
+      register: jenkins_status
+      failed_when: "'Active: active (running)' not in jenkins_status.stdout"
+
+    - name: Display Jenkins service logs
+      command: journalctl -xeu jenkins.service
+      when: jenkins_service is failed
+      register: jenkins_logs
+
+    - name: Display Jenkins service logs
+      debug:
+        var: jenkins_logs.stdout_lines
+      when: jenkins_service is failed 
