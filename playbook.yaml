@@ -120,3 +120,21 @@
         name: nginx
         state: started
         enabled: yes
+
+- name: Ensure test.html exists
+  stat:
+    path: test.html
+  register: test_html_file
+
+- name: Fail if test.html is not found
+  fail:
+    msg: "The file test.html does not exist"
+  when: not test_html_file.stat.exists
+
+- name: Copy test.html to nginx web root
+  copy:
+    src: test.html
+    dest: /var/www/html/test.html
+    owner: www-data
+    group: www-data
+    mode: '0644'
